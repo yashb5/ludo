@@ -10,7 +10,7 @@ import {
 } from '../utils/gameConstants';
 import { getTokenScreenPosition, shadeColor } from '../utils/gameUtils';
 
-function Board({ tokens, movableTokens, onTokenClick }) {
+function Board({ tokens, movableTokens, onTokenClick, playerColor = 'red' }) {
   const canvasRef = useRef(null);
 
   const drawBoard = useCallback((ctx) => {
@@ -88,7 +88,7 @@ function Board({ tokens, movableTokens, onTokenClick }) {
     const y = (event.clientY - rect.top) * (canvas.height / rect.height);
     
     for (const idx of movableTokens) {
-      const tokenPos = getTokenScreenPosition('red', idx, tokens);
+      const tokenPos = getTokenScreenPosition(playerColor, idx, tokens);
       const dist = Math.sqrt((x - tokenPos.x) ** 2 + (y - tokenPos.y) ** 2);
       
       if (dist < CELL_SIZE * 0.6) {

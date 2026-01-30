@@ -1,42 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-function Dice({ value, onRoll, canRoll }) {
+function Dice({ value, onRoll, canRoll, isRolling: externalIsRolling }) {
   const [displayValue, setDisplayValue] = useState(value || '?');
-  const [isRolling, setIsRolling] = useState(false);
+  const [isWaitingForRoll, setIsWaitingForRoll] = useState(false);
+  const [isSix, setIsSix] = useState(false);
+  const prevValueRef = useRef();
+  const timeoutRef = useRef();
 
   useEffect(() => {
-    if (value) {
+    if (value && value !== prevValueRef.current) {
       setDisplayValue(value);
+      setIsWaitingForRoll(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      if (value === 6) {
+        setIsSix(true);
+        playSixSound();
+        setTimeout(() => setIsSix(false), 1500);
+      }
+      prevValueRef.current = value;
     }
   }, [value]);
 
-  const handleRoll = () => {
-    if (!canRoll) return;
-    
-    setIsRolling(true);
-    
-    // Animate dice
-    let rolls = 0;
-    const interval = setInterval(() => {
-      setDisplayValue(Math.floor(Math.random() * 6) + 1);
-      rolls++;
-      if (rolls >= 10) {
-        clearInterval(interval);
-        setIsRolling(false);
-        onRoll();
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-    }, 50);
+    };
+  }, []);
+
+  const playSixSound = () => {
+    // Simple celebratory sound using Web Audio API
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(523, audioContext.currentTime); // C5
+    oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1); // E5
+    oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2); // G5
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+  };
+
+  const handleRoll = () => {
+    if (!canRoll || externalIsRolling || isWaitingForRoll) return;
+
+    setIsWaitingForRoll(true);
+    setDisplayValue('?');
+    onRoll();
+
+    // Timeout in case server doesn't respond
+    timeoutRef.current = setTimeout(() => {
+      if (displayValue === '?') {
+        setDisplayValue('⚠️');
+        setIsWaitingForRoll(false);
+        timeoutRef.current = null;
+      }
+    }, 5000);
   };
 
   return (
     <div className="dice-container">
-      <div className={`dice ${isRolling ? 'rolling' : ''}`}>
+      <div className={`dice ${(externalIsRolling || isWaitingForRoll) ? 'rolling' : ''} ${isSix ? 'six-celebration' : ''}`}>
         {displayValue}
       </div>
-      <button 
+      <button
         className="roll-btn"
         onClick={handleRoll}
-        disabled={!canRoll || isRolling}
+        disabled={!canRoll || externalIsRolling || isWaitingForRoll}
       >
         Roll Dice
       </button>
